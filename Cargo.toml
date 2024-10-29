@@ -1,0 +1,26 @@
+[package]
+name = "ellipse-matcher"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+itertools = "0.13.0"
+nalgebra = "0.33.0"
+num-traits = "0.2.19"
+simba = "0.9.0"
+
+[dev-dependencies]
+approx = "0.5.1"
+rerun = { version = "0.19.0", features = ["web_viewer"] }
+
+[features]
+default = ["f64"]
+f64 = []
+f32 = []
+f16 = []
+
+
+[[example]]
+name = "rerun"
+path = "examples/rerun_visualization.rs"
