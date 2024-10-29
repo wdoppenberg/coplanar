@@ -1,5 +1,5 @@
 [package]
-name = "ellipse-matcher"
+name = "coplanar"
 version = "0.1.0"
 edition = "2021"
 

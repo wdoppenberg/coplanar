@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ellipse_matcher::{spatial_ellipse::SpatialEllipse, utils::sample_ellipse_points};
+use coplanar::{spatial_ellipse::SpatialEllipse, utils::sample_ellipse_points};
 use nalgebra as na;
 use num_traits::Float;
 use rerun as rr;
@@ -152,7 +152,14 @@ fn main() -> Result<()> {
     }
 
     // Configure space
-    rec.log_static("space", &rr::ViewCoordinates::RIGHT_HAND_Y_UP)?;
+    rec.log_static("world", &rr::ViewCoordinates::RIGHT_HAND_Y_UP)?;
+    rec.log(
+        "world/xyz",
+        &rr::Arrows3D::from_vectors(
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], //
+        )
+        .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
+    )?;
 
     Ok(())
 }
