@@ -1,11 +1,10 @@
-use nalgebra as na;
-use num_traits::Float;
 use std::fmt::Debug;
 
-use crate::spatial_ellipse::SpatialEllipse;
+use crate::SpatialEllipse;
+use nalgebra as na;
 
 /// Helper function to create points along an ellipse for visualization
-pub fn sample_ellipse_points<F: Float + na::RealField + Debug>(
+pub fn sample_ellipse_points<F: na::RealField + Copy + Debug>(
     spatial_ellipse: &SpatialEllipse<F>,
     num_points: usize,
 ) -> Vec<na::Point3<F>> {
@@ -16,13 +15,13 @@ pub fn sample_ellipse_points<F: Float + na::RealField + Debug>(
 
     // Sample points in local frame
     for i in 0..num_points {
-        let t = F::from(i as f64 * 2.0 / num_points as f64).unwrap() * F::pi();
-        let cos_t = Float::cos(t);
-        let sin_t = Float::sin(t);
+        let t = F::from_f64(i as f64 * 2.0 / num_points as f64).unwrap() * F::pi();
+        let cos_t = t.cos();
+        let sin_t = t.sin();
 
         // Extract semi-major and semi-minor from ellipse matrix
         // Note: This is a simplification, should properly extract axes
-        let (a, b) = (F::one(), F::from(0.5).unwrap()); // Example values
+        let (a, b) = (F::one(), F::from_f64(0.5).unwrap()); // Example values
 
         // Point in local frame
         let local_point = na::Point3::new(a * cos_t, b * sin_t, F::zero());

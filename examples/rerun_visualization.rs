@@ -1,34 +1,23 @@
 use anyhow::Result;
-use coplanar::{spatial_ellipse::SpatialEllipse, utils::sample_ellipse_points};
+use coplanar::{utils::sampling::sample_ellipse_points, SpatialEllipse};
 use nalgebra as na;
-use num_traits::Float;
 use rerun as rr;
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
 /// Convert nalgebra vector to rerun Vector3D
-fn vec_to_vector3d<F: Float + na::RealField>(vec: &na::Vector3<F>) -> rr::datatypes::Vec3D {
-    rr::datatypes::Vec3D::new(
-        vec.x.to_f32().unwrap(),
-        vec.y.to_f32().unwrap(),
-        vec.z.to_f32().unwrap(),
-    )
+fn vec_to_vector3d(vec: &na::Vector3<f32>) -> rr::datatypes::Vec3D {
+    rr::datatypes::Vec3D::new(vec.x, vec.y, vec.z)
 }
 
 /// Convert nalgebra point to rerun vec3
-fn point_to_vec3<F: Float + na::RealField>(point: &na::Point3<F>) -> rr::datatypes::Vec3D {
-    rr::datatypes::Vec3D::new(
-        point.x.to_f32().unwrap(),
-        point.y.to_f32().unwrap(),
-        point.z.to_f32().unwrap(),
-    )
+fn point_to_vec3(point: &na::Point3<f32>) -> rr::datatypes::Vec3D {
+    rr::datatypes::Vec3D::new(point.x, point.y, point.z)
 }
 
-fn create_coordinate_frame_arrows<F: Float + na::RealField>(
-    transform: &na::Matrix4<F>,
+fn create_coordinate_frame_arrows(
+    transform: &na::Matrix4<f32>,
     scale: f32,
 ) -> Vec<rr::datatypes::Vec3D> {
-    let scale = F::from(scale).unwrap();
-
     // Create the axis vectors directly
     vec![
         vec_to_vector3d(&transform.fixed_view::<3, 1>(0, 0).scale(scale)),
@@ -43,12 +32,12 @@ fn main() -> Result<()> {
 
     // Create an ellipse
     let original_ellipse = SpatialEllipse::new(
-        na::Point3::new(0.0, 0.0, 0.0),
+        na::Point3::new(0.0f32, 0.0, 0.0),
         na::Unit::new_normalize(na::Vector3::new(0.0, 0.0, 1.0)),
         2.0, // semi-major
         1.0, // semi-minor
         0.0, // rotation
-    );
+    )?;
 
     // Sample points for visualization
     let original_points = sample_ellipse_points(&original_ellipse, 50);
@@ -85,17 +74,14 @@ fn main() -> Result<()> {
     // Create transformations with descriptive names
     let transforms = vec![
         (
-            "Translation (+3 in X)",
-            na::Translation3::new(3.0, 0.0, 0.0).to_homogeneous(),
-        ),
-        (
             "Rotation (45° around Y)",
-            na::UnitQuaternion::from_euler_angles(0.0, PI / 4.0, 0.0).to_homogeneous(),
+            na::UnitQuaternion::from_euler_angles(0.0f32, PI / 4.0, 0.0).to_homogeneous(),
         ),
         (
             "Combined (translate + rotate)",
             na::Translation3::new(2.0, 2.0, 2.0).to_homogeneous()
-                * na::UnitQuaternion::from_euler_angles(PI / 6.0, PI / 4.0, 0.0).to_homogeneous(),
+                * na::UnitQuaternion::from_euler_angles(PI / 6.0f32, PI / 4.0, 0.0)
+                    .to_homogeneous(),
         ),
     ];
 
@@ -153,13 +139,13 @@ fn main() -> Result<()> {
 
     // Configure space
     rec.log_static("world", &rr::ViewCoordinates::RIGHT_HAND_Y_UP)?;
-    rec.log(
-        "world/xyz",
-        &rr::Arrows3D::from_vectors(
-            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], //
-        )
-        .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
-    )?;
+    // rec.log(
+    //     "world/xyz",
+    //     &rr::Arrows3D::from_vectors(
+    //         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], //
+    //     )
+    //     .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
+    // )?;
 
     Ok(())
 }

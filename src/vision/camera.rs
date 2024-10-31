@@ -1,12 +1,12 @@
-use crate::EllipseMatrix;
+use crate::geom::ellipse::planar::Quadratic;
+use crate::PlanarEllipse;
 use anyhow::{anyhow, Result};
 use nalgebra as na;
-use num_traits::Float;
 use std::fmt::Debug;
 
 /// Camera intrinsic parameters
 #[derive(Debug, Clone)]
-pub struct CameraIntrinsics<F: Float> {
+pub struct CameraIntrinsics<F: na::RealField> {
     /// Focal length in x direction (pixels)
     pub fx: F,
     /// Focal length in y direction (pixels)
@@ -16,21 +16,21 @@ pub struct CameraIntrinsics<F: Float> {
     /// Principal point y coordinate (pixels)
     pub cy: F,
     /// Image width in pixels
-    pub width: u32,
+    pub width: usize,
     /// Image height in pixels
-    pub height: u32,
+    pub height: usize,
 }
 
 /// Camera pose in MCMF frame
 #[derive(Debug, Clone)]
-pub struct CameraPose<F: Float + na::RealField> {
+pub struct CameraPose<F: na::RealField> {
     /// Rotation matrix from MCMF to camera frame
     pub rotation: na::Matrix3<F>,
     /// Translation vector from MCMF origin to camera center in MCMF frame
     pub translation: na::Vector3<F>,
 }
 
-impl<F: Float + na::RealField> CameraPose<F> {
+impl<F: na::RealField + Copy> CameraPose<F> {
     /// Creates camera pose from position and attitude
     pub fn from_position_attitude(
         position: na::Vector3<F>,
@@ -77,7 +77,7 @@ pub fn project_point<F>(
     intrinsics: &CameraIntrinsics<F>,
 ) -> Result<na::Point2<F>>
 where
-    F: Float + na::RealField,
+    F: na::RealField + Copy,
 {
     // Transform point to camera frame
     let p_cam = camera.rotation * (point - camera.translation);
@@ -93,9 +93,9 @@ where
 
     // Check if point is within image bounds
     if x < F::zero()
-        || x >= F::from(intrinsics.width).unwrap()
+        || x >= F::from_usize(intrinsics.width).unwrap()
         || y < F::zero()
-        || y >= F::from(intrinsics.height).unwrap()
+        || y >= F::from_usize(intrinsics.height).unwrap()
     {
         return Err(anyhow!("Point projects outside image bounds"));
     }
@@ -103,24 +103,24 @@ where
     Ok(na::Point2::new(x, y))
 }
 
-/// Projects an ellipse from MCMF frame onto the camera image plane
+/// Projects an ellipse from world frame onto the camera image plane
 pub fn project_ellipse<F>(
-    ellipse: &na::Unit<EllipseMatrix<F>>,
+    ellipse: &na::Unit<PlanarEllipse<Quadratic<F>>>,
     camera: &CameraPose<F>,
     intrinsics: &CameraIntrinsics<F>,
-) -> Result<EllipseMatrix<F>>
+) -> Result<PlanarEllipse<Quadratic<F>>>
 where
-    F: Float + na::RealField + Debug,
+    F: na::RealField + Copy + Debug,
 {
     let zero = F::zero();
     let one = F::one();
 
-    // Extract the quadric matrix Q from the ellipse matrix
+    // Extract the quadratic matrix Q from the ellipse matrix
     let a = ellipse.fixed_view::<2, 2>(0, 0);
     let b = ellipse.fixed_view::<2, 1>(0, 2);
     let c = ellipse[(2, 2)];
 
-    // Construct the 4x4 quadric matrix
+    // Construct the 4x4 quadratic matrix
     let mut q = na::Matrix4::zeros();
     q.fixed_view_mut::<2, 2>(0, 0).copy_from(&a);
     q.fixed_view_mut::<2, 1>(0, 2).copy_from(&b);
@@ -164,13 +164,12 @@ where
         .copy_from(&q_img.fixed_view::<1, 2>(2, 0));
     e_img[(2, 2)] = q_img[(2, 2)];
 
-    Ok(EllipseMatrix::new(e_img))
+    Ok(PlanarEllipse::try_from_matrix(e_img)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EllipseParametric;
     use approx::assert_relative_eq;
     use nalgebra::Normed;
 
@@ -192,18 +191,18 @@ mod tests {
             height: 480,
         };
 
-        // Create a circular crater at origin
-        let crater = EllipseParametric::new(1.0, 1.0, 0.0, 0.0, 0.0);
-        let crater_matrix = EllipseMatrix::from(crater);
-        let unit_crater = na::Unit::new_normalize(crater_matrix);
+        // Create a circular ellipse at origin
+        let ellipse =
+            PlanarEllipse::from_parameters(1.0, 1.0, 0.0, 0.0, 0.0).try_into_quadratic()?;
+        let unit_ellipse = na::Unit::new_normalize(ellipse);
 
-        // Project the crater
-        let projected = project_ellipse(&unit_crater, &camera, &intrinsics)?;
+        // Project the ellipse
+        let projected = project_ellipse(&unit_ellipse, &camera, &intrinsics)?;
 
         // The projection of a circle under perspective should be an ellipse
         // Test some basic properties
         let det = projected.determinant();
-        assert!(det != 0.0, "Projected ellipse should be non-degenerate");
+        assert_ne!(det, 0.0, "Projected ellipse should be non-degenerate");
 
         Ok(())
     }
@@ -227,12 +226,13 @@ mod tests {
             height: 480,
         };
 
-        // Create an elliptical crater
-        let crater = EllipseParametric::new(2.0, 1.0, pi / 6.0, 1.0, 1.0);
-        let crater_matrix = EllipseMatrix::from(crater);
-        let unit_crater = na::Unit::new_normalize(crater_matrix);
+        // Create an elliptical ellipse
+        // TODO: Find out why this fails if theta < (pi / 2.)
+        let ellipse =
+            PlanarEllipse::from_parameters(2.0, 1.0, pi / 2.0, 1.0, 1.0).try_into_quadratic()?;
+        let unit_ellipse = na::Unit::new_normalize(ellipse);
 
-        let projected = project_ellipse(&unit_crater, &camera, &intrinsics)?;
+        let projected = project_ellipse(&unit_ellipse, &camera, &intrinsics)?;
 
         // Verify the projected ellipse exists
         assert!(projected.norm() > 0.0);

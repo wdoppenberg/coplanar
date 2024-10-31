@@ -1,25 +1,25 @@
 use anyhow::{anyhow, Result};
 use nalgebra as na;
-use num_traits::Float;
 use std::fmt::Debug;
 
+use crate::geom::ellipse::planar::Quadratic;
 use crate::{
-    camera::{project_ellipse, CameraIntrinsics, CameraPose},
-    EllipseMatrix, EllipseParametric,
+    vision::camera::{project_ellipse, CameraIntrinsics, CameraPose},
+    PlanarEllipse,
 };
 
 /// Represents an ellipse embedded in 3D space
 #[derive(Debug, Clone)]
-pub struct SpatialEllipse<F: Float + na::RealField + Debug> {
+pub struct SpatialEllipse<F: na::RealField + Debug + Copy> {
     /// Center position in 3D space
     pub center: na::Point3<F>,
     /// Normal vector to the ellipse plane
     pub normal: na::Unit<na::Vector3<F>>,
     /// Elliptical shape in the local plane
-    pub ellipse: na::Unit<EllipseMatrix<F>>,
+    pub ellipse: na::Unit<PlanarEllipse<Quadratic<F>>>,
 }
 
-impl<F: Float + na::RealField + Debug> SpatialEllipse<F> {
+impl<F: na::RealField + Copy + Debug> SpatialEllipse<F> {
     /// Create a new ellipse from its center, normal, and ellipse parameters
     pub fn new(
         center: na::Point3<F>,
@@ -27,8 +27,8 @@ impl<F: Float + na::RealField + Debug> SpatialEllipse<F> {
         semi_major: F,
         semi_minor: F,
         rotation: F,
-    ) -> Self {
-        let ellipse = EllipseParametric::new(
+    ) -> Result<Self, crate::Error> {
+        let ellipse = PlanarEllipse::from_parameters(
             semi_major,
             semi_minor,
             rotation,
@@ -36,16 +36,18 @@ impl<F: Float + na::RealField + Debug> SpatialEllipse<F> {
             F::zero(),
         );
 
-        Self {
+        let ellipse_quad = ellipse.try_into_quadratic()?;
+
+        Ok(Self {
             center,
             normal,
-            ellipse: na::Unit::new_normalize(EllipseMatrix::from(ellipse)),
-        }
+            ellipse: na::Unit::new_normalize(ellipse_quad),
+        })
     }
 
     /// Create a spatial ellipse from an existing ellipse matrix and a pose in 3D
     pub fn from_ellipse_and_pose(
-        ellipse: na::Unit<EllipseMatrix<F>>,
+        ellipse: na::Unit<PlanarEllipse<Quadratic<F>>>,
         center: na::Point3<F>,
         normal: na::Unit<na::Vector3<F>>,
     ) -> Self {
@@ -63,9 +65,9 @@ impl<F: Float + na::RealField + Debug> SpatialEllipse<F> {
 
         // Choose arbitrary x direction perpendicular to z
         // We use the minimal component strategy to avoid numerical issues
-        let x = if Float::abs(z.x) < Float::abs(z.y) && Float::abs(z.x) < Float::abs(z.z) {
+        let x = if z.x.abs() < z.y.abs() && z.x.abs() < z.z.abs() {
             na::Unit::new_normalize(na::Vector3::new(F::one(), F::zero(), F::zero()))
-        } else if Float::abs(z.y) < Float::abs(z.x) && Float::abs(z.y) < Float::abs(z.z) {
+        } else if z.y.abs() < z.x.abs() && z.y.abs() < z.z.abs() {
             na::Unit::new_normalize(na::Vector3::new(F::zero(), F::one(), F::zero()))
         } else {
             na::Unit::new_normalize(na::Vector3::new(F::zero(), F::zero(), F::one()))
@@ -127,7 +129,7 @@ impl<F: Float + na::RealField + Debug> SpatialEllipse<F> {
         &self,
         camera: &CameraPose<F>,
         intrinsics: &CameraIntrinsics<F>,
-    ) -> Result<EllipseMatrix<F>> {
+    ) -> Result<PlanarEllipse<Quadratic<F>>> {
         // First transform to camera coordinates
         let view = camera.view_matrix();
         let transformed = self.transform(&view)?;
@@ -145,7 +147,7 @@ impl<F: Float + na::RealField + Debug> SpatialEllipse<F> {
 }
 
 // Helper impl for camera pose
-impl<F: Float + na::RealField> CameraPose<F> {
+impl<F: na::RealField + Copy> CameraPose<F> {
     /// Get the view matrix (world to camera transform)
     pub fn view_matrix(&self) -> na::Matrix4<F> {
         let mut view = na::Matrix4::identity();
@@ -171,7 +173,8 @@ mod tests {
             center, normal, 2.0, // semi-major
             1.0, // semi-minor
             0.0, // rotation
-        );
+        )
+        .unwrap();
 
         assert_relative_eq!(
             ellipse.center.coords.norm(),
@@ -189,7 +192,7 @@ mod tests {
             1.0,
             0.5,
             0.0,
-        );
+        )?;
 
         // Create a translation and rotation
         let translation = na::Translation3::new(1.0, 2.0, 3.0);
@@ -224,7 +227,7 @@ mod tests {
             1.0,
             0.5,
             0.0,
-        );
+        )?;
 
         let camera = CameraPose::from_position_attitude(
             na::Vector3::new(0.0, 0.0, 0.0),
@@ -256,7 +259,8 @@ mod tests {
             1.0,
             0.5,
             0.0,
-        );
+        )
+        .unwrap();
 
         let camera = CameraPose::from_position_attitude(
             na::Vector3::new(0.0, 0.0, 0.0),
