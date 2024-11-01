@@ -16,7 +16,7 @@ pub struct SpatialEllipse<F: na::RealField + Debug + Copy> {
     /// Normal vector to the ellipse plane
     pub normal: na::Unit<na::Vector3<F>>,
     /// Elliptical shape in the local plane
-    pub ellipse: na::Unit<PlanarEllipse<Quadratic<F>>>,
+    pub ellipse: PlanarEllipse<Quadratic<F>>,
 }
 
 impl<F: na::RealField + Copy + Debug> SpatialEllipse<F> {
@@ -41,13 +41,13 @@ impl<F: na::RealField + Copy + Debug> SpatialEllipse<F> {
         Ok(Self {
             center,
             normal,
-            ellipse: na::Unit::new_normalize(ellipse_quad),
+            ellipse: ellipse_quad,
         })
     }
 
     /// Create a spatial ellipse from an existing ellipse matrix and a pose in 3D
     pub fn from_ellipse_and_pose(
-        ellipse: na::Unit<PlanarEllipse<Quadratic<F>>>,
+        ellipse: PlanarEllipse<Quadratic<F>>,
         center: na::Point3<F>,
         normal: na::Unit<na::Vector3<F>>,
     ) -> Self {

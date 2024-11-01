@@ -24,3 +24,7 @@ f16 = []
 [[example]]
 name = "rerun"
 path = "examples/rerun_visualization.rs"
+
+[[example]]
+name = "simple"
+path = "examples/simple.rs"

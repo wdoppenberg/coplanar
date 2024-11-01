@@ -9,4 +9,7 @@ pub enum Error {
 
     #[error(transparent)]
     PlanarEllipse(#[from] PlanarEllipseError),
+
+    #[error("Unknown error: {0}")]
+    Unknown(#[from] anyhow::Error),
 }

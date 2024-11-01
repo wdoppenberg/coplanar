@@ -8,7 +8,7 @@ use thiserror::Error;
 pub enum AdjugateError {
     #[error("Matrix contains NaN or infinite values")]
     NanError,
-    #[error("Matrix is numerically unstable (values too large or small): {0}")]
+    #[error("Matrix is numerically unstable: {0}")]
     NumericalInstabilityError(String),
 }
 

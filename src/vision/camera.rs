@@ -105,7 +105,7 @@ where
 
 /// Projects an ellipse from world frame onto the camera image plane
 pub fn project_ellipse<F>(
-    ellipse: &na::Unit<PlanarEllipse<Quadratic<F>>>,
+    ellipse: &PlanarEllipse<Quadratic<F>>,
     camera: &CameraPose<F>,
     intrinsics: &CameraIntrinsics<F>,
 ) -> Result<PlanarEllipse<Quadratic<F>>>

@@ -102,9 +102,8 @@ impl<F: na::RealField + Copy> EllipseRepr for Parametric<F> {
 impl<F: na::RealField + Copy> EllipseRepr for Quadratic<F> {
     /*
     See https://linux-blog.anracom.com/2023/09/04/properties-of-ellipses-by-matrix-coefficients-i-two-defining-matrices/
-    for details on implementation.
+    for the math behind implementation.
     */
-
     type F = F;
     fn semi_major(&self) -> F {
         let (a, b) = self.extract_semi_axes();

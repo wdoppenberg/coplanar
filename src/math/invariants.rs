@@ -3,7 +3,6 @@ use crate::math::matrix_adjugate;
 use crate::PlanarEllipse;
 use anyhow::{anyhow, Result};
 use nalgebra as na;
-use nalgebra::Unit;
 use std::fmt::Debug;
 
 /// Translation-invariant features describing the relationship between three ellipses
@@ -167,45 +166,25 @@ pub fn ellipse_triad_feature<F: na::RealField + Copy + Debug>(
     Ok(((f1 - f2) * a1_norm).trace())
 }
 
-pub fn coplanar_invariants<F: na::RealField + Debug + Copy>(
-    a_i: &na::Matrix3<F>,
-    a_j: &na::Matrix3<F>,
-    a_k: &na::Matrix3<F>,
-) -> Result<CoplanarInvariants<F>> {
-    let (i_ij, i_ji) = ellipse_pair_feature(a_i, a_j)?;
-    let (i_ik, i_ki) = ellipse_pair_feature(a_i, a_k)?;
-    let (i_jk, i_kj) = ellipse_pair_feature(a_j, a_k)?;
-
-    let i_ijk = ellipse_triad_feature(a_i, a_j, a_k)?;
-
-    Ok(CoplanarInvariants {
-        i_ij,
-        i_ji,
-        i_ik,
-        i_ki,
-        i_jk,
-        i_kj,
-        i_ijk,
-    })
-}
-
 /// Compute coplanar invariants from three normalized ellipse matrices
 pub fn compute_invariants<F, R>(
-    ellipses: [&Unit<PlanarEllipse<R>>; 3],
+    e1: &PlanarEllipse<R>,
+    e2: &PlanarEllipse<R>,
+    e3: &PlanarEllipse<R>,
 ) -> Result<CoplanarInvariants<F>>
 where
     F: na::RealField + Copy + Debug,
     R: EllipseRepr<F = F>,
 {
-    let mats = ellipses.map(|e| e.to_matrix());
-    coplanar_invariants(&mats[0], &mats[1], &mats[2])
+    let [mat1, mat2, mat3] = [e1, e2, e3].map(|e| na::Unit::new_normalize(e.to_matrix()));
+    coplanar_invariants(&mat1, &mat2, &mat3)
 }
 
 // Modified coplanar_invariants function
-pub fn coplanar_invariants_stable<F: na::RealField + Copy + Debug>(
-    a_i: &na::Matrix3<F>,
-    a_j: &na::Matrix3<F>,
-    a_k: &na::Matrix3<F>,
+pub fn coplanar_invariants<F: na::RealField + Copy + Debug>(
+    a_i: &na::Unit<na::Matrix3<F>>,
+    a_j: &na::Unit<na::Matrix3<F>>,
+    a_k: &na::Unit<na::Matrix3<F>>,
 ) -> Result<CoplanarInvariants<F>> {
     // First normalize all matrices
     let a_i_norm = try_scale_det(a_i)?;
@@ -231,13 +210,13 @@ pub fn coplanar_invariants_stable<F: na::RealField + Copy + Debug>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geom::ellipse::planar::Quadratic;
+    use crate::geom::ellipse::planar::Parametric;
     use crate::PlanarEllipse;
     use crate::SpatialEllipse;
     use approx::assert_relative_eq;
     use std::f64::consts::PI;
 
-    fn create_test_ellipses() -> [na::Unit<PlanarEllipse<Quadratic<f64>>>; 3] {
+    fn create_test_ellipses() -> [PlanarEllipse<Parametric<f64>>; 3] {
         // Create a triangular configuration for better stability
         [
             (0.0, 0.0), // Center
@@ -245,8 +224,7 @@ mod tests {
             (-4., -1.), // Top (equilateral triangle)
         ]
         .map(|(x, y)| {
-            let e = PlanarEllipse::from_parameters(1.0, 1.0, 0.0, x, y); // Using circles for stability
-            na::Unit::new_normalize(e.try_into_quadratic().unwrap())
+            PlanarEllipse::from_parameters(1.0, 1.0, 0.0, x, y) // Using circles for stability
         })
     }
 
@@ -273,13 +251,14 @@ mod tests {
         let ellipses = create_test_ellipses();
 
         // Check that matrices are normalized
-        for e in &ellipses {
+        for e in ellipses {
+            let e = na::Unit::new_normalize(e.try_into_quadratic()?);
             assert_relative_eq!(e.norm(), 1.0, epsilon = 1e-10);
 
             // Check determinant is non-zero
             let det = e.determinant();
             println!("Determinant: {}", det);
-            assert!(det != 0.0);
+            assert_ne!(det, 0.0);
 
             // Check that matrix is invertible
             assert!(e.try_inverse().is_some());
@@ -291,11 +270,11 @@ mod tests {
     #[test]
     fn test_invariant_under_translation() -> Result<()> {
         let spatial_ellipses = create_spatial_ellipses();
-        let original_inv = compute_invariants([
+        let original_inv = compute_invariants(
             &spatial_ellipses[0].ellipse,
             &spatial_ellipses[1].ellipse,
             &spatial_ellipses[2].ellipse,
-        ])?;
+        )?;
 
         // Apply global translation
         let translation = na::Translation3::new(10.0, -5.0, 3.0).to_homogeneous();
@@ -304,11 +283,11 @@ mod tests {
             .map(|e| e.transform(&translation).unwrap())
             .collect();
 
-        let translated_inv = compute_invariants([
+        let translated_inv = compute_invariants(
             &translated_ellipses[0].ellipse,
             &translated_ellipses[1].ellipse,
             &translated_ellipses[2].ellipse,
-        ])?;
+        )?;
 
         assert_relative_eq!(original_inv.distance(&translated_inv), 0.0, epsilon = 1e-6);
 
@@ -318,11 +297,11 @@ mod tests {
     #[test]
     fn test_invariant_under_rotation() -> Result<()> {
         let spatial_ellipses = create_spatial_ellipses();
-        let original_inv = compute_invariants([
+        let original_inv = compute_invariants(
             &spatial_ellipses[0].ellipse,
             &spatial_ellipses[1].ellipse,
             &spatial_ellipses[2].ellipse,
-        ])?;
+        )?;
 
         // Apply global rotation
         let rotation = na::UnitQuaternion::from_euler_angles(PI / 4.0, 0.0, 0.0).to_homogeneous();
@@ -331,11 +310,11 @@ mod tests {
             .map(|e| e.transform(&rotation).unwrap())
             .collect();
 
-        let rotated_inv = compute_invariants([
+        let rotated_inv = compute_invariants(
             &rotated_ellipses[0].ellipse,
             &rotated_ellipses[1].ellipse,
             &rotated_ellipses[2].ellipse,
-        ])?;
+        )?;
 
         assert_relative_eq!(original_inv.distance(&rotated_inv), 0.0, epsilon = 1e-6);
 
@@ -345,11 +324,11 @@ mod tests {
     #[test]
     fn test_invariant_stability() -> Result<()> {
         let spatial_ellipses = create_spatial_ellipses();
-        let base_inv = compute_invariants([
+        let base_inv = compute_invariants(
             &spatial_ellipses[0].ellipse,
             &spatial_ellipses[1].ellipse,
             &spatial_ellipses[2].ellipse,
-        ])?;
+        )?;
 
         // Create slightly perturbed ellipse
         let perturbed = SpatialEllipse::new(
@@ -358,14 +337,13 @@ mod tests {
             1.0 + 1e-6,
             1.0 + 1e-6,
             1e-6,
-        )
-        .unwrap();
+        )?;
 
-        let perturbed_inv = compute_invariants([
+        let perturbed_inv = compute_invariants(
             &perturbed.ellipse,
             &spatial_ellipses[1].ellipse,
             &spatial_ellipses[2].ellipse,
-        ])?;
+        )?;
 
         assert!(base_inv.distance(&perturbed_inv) < 1e-3);
 
