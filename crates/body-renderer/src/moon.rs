@@ -1,11 +1,13 @@
 use crate::dem::DEMManager;
+use std::num::NonZeroU16;
 
 use bevy::core_pipeline::core_3d::{Camera3dDepthLoadOp, ScreenSpaceTransmissionQuality};
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
-use bevy::render::render_resource::Face;
+use bevy::render::render_resource::{AddressMode, Face, FilterMode, SamplerDescriptor};
+use bevy::render::texture::{ImageSampler, ImageSamplerDescriptor};
 use gdal::raster::StatisticsAll;
 use gdal::Dataset;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -115,6 +117,7 @@ fn setup(
                 double_sided: false,         // Disable double-sided rendering
                 parallax_mapping_method: ParallaxMappingMethod::Relief { max_steps: 32 },
                 parallax_depth_scale: 0.1,
+                // alpha_mode: AlphaMode::Opaque,
                 ..default()
             }),
             transform: Transform::from_scale(Vec3::splat(1.0)),
@@ -133,16 +136,16 @@ fn setup(
             color: Color::WHITE,
             illuminance: 1.27e5,
             shadows_enabled: true,
-            shadow_depth_bias: 0.00001, // Reduced from 0.001 for better precision
-            shadow_normal_bias: 0.00001, // Reduced from 0.01 for better precision
+            shadow_depth_bias: 0.00000001,
+            shadow_normal_bias: 0.00000001,
         },
         // Add these new shadow quality settings
         cascade_shadow_config: CascadeShadowConfigBuilder {
-            first_cascade_far_bound: 10.0,
-            maximum_distance: 10.0,
-            minimum_distance: 0.1,
-            num_cascades: 6,
-            ..default()
+            minimum_distance: 0.0001,    // Closer minimum distance
+            maximum_distance: 10.,       // Adjusted for moon scale
+            first_cascade_far_bound: 2., // Tighter first cascade
+            num_cascades: 32,            // Increased number of cascades
+            overlap_proportion: 0.99,    // Increased overlap to reduce transitions
         }
         .into(),
         transform: Transform::from_xyz(4.0, 2.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -244,13 +247,69 @@ fn update_moon_lod(
     }
 }
 
-fn update_sunlight(time: Res<Time>, mut query: Query<&mut Transform, With<DirectionalLight>>) {
-    for mut transform in query.iter_mut() {
-        let angle = time.elapsed_seconds() * 0.1; // Slow rotation
-        let x = 4.0 * angle.cos();
-        let z = 4.0 * angle.sin();
-        *transform = Transform::from_xyz(x, 2.0, z).looking_at(Vec3::ZERO, Vec3::Y);
+fn update_sunlight(
+    time: Res<Time>,
+    mut query: Query<(&mut Transform, &mut DirectionalLight), With<DirectionalLight>>,
+) {
+    for (mut transform, mut light) in query.iter_mut() {
+        if light.shadows_enabled {
+            let angle = time.elapsed_seconds() * 0.1;
+            let x = 4.0 * angle.cos();
+            let z = 4.0 * angle.sin();
+            *transform = Transform::from_xyz(x, 2.0, z).looking_at(Vec3::ZERO, Vec3::Y);
+
+            // Calculate light angle relative to surface
+            let light_dir = -transform.forward();
+            let height_ratio = light_dir.y.abs(); // How parallel the light is to the surface
+
+            // Calculate grazing angle factor (0 = parallel to surface, 1 = perpendicular)
+            let grazing_angle = 1.0 - height_ratio;
+
+            // Exponential bias adjustment for grazing angles
+            let base_bias = 0.000000001;
+            let max_bias = 0.0000001;
+
+            // More aggressive bias adjustment for grazing angles
+            let angle_factor = grazing_angle.powi(3); // Cubic function for sharper adjustment
+            let dynamic_bias = base_bias + (max_bias - base_bias) * angle_factor;
+
+            // Additional distance-based scaling
+            let distance = transform.translation.length();
+            let distance_scale = (distance / 10.0).max(1.0);
+
+            // Final bias calculations with extra precision for grazing angles
+            let depth_bias = dynamic_bias * distance_scale * (1.0 + grazing_angle * 2.0);
+            let normal_bias = dynamic_bias * distance_scale * (1.0 + grazing_angle * 1.5);
+
+            light.shadow_depth_bias = depth_bias;
+            light.shadow_normal_bias = normal_bias;
+
+            // Adjust light intensity based on angle for more realistic eclipse effect
+            light.illuminance = 1.27e5 * (0.8 + 0.2 * height_ratio);
+        }
     }
+}
+
+fn get_position(
+    lat_deg: f32,
+    lon_deg: f32,
+    dem: &mut DEMManager,
+    min_elevation: f32,
+    scale_factor: f32,
+) -> Vec3 {
+    let elevation = dem.get_elevation(lat_deg, lon_deg);
+    let elevation_scaled = (elevation - min_elevation) / 1_737_400.0 * scale_factor;
+    let radius = 1.0 + elevation_scaled;
+
+    let lat_rad = lat_deg.to_radians();
+    let lon_rad = lon_deg.to_radians();
+    let cos_lat = lat_rad.cos();
+
+    Vec3::new(
+        radius * cos_lat * lon_rad.cos(),
+        radius * lat_rad.sin(),
+        radius * cos_lat * lon_rad.sin(),
+    )
 }
 
 fn create_moon_mesh(lod: usize, dem: &mut DEMManager) -> Mesh {
@@ -262,19 +321,47 @@ fn create_moon_mesh(lod: usize, dem: &mut DEMManager) -> Mesh {
     let mut uvs = Vec::new();
     let mut indices = Vec::new();
 
-    // Generate vertices
+    // Sample elevation range with smoothing
+    let mut elevation_samples = Vec::new();
     for lat in 0..=latitude_segments {
         let lat_frac = lat as f32 / latitude_segments as f32;
-        // Convert to degrees, going from 90° (North) to -90° (South)
         let lat_deg = 90.0 - lat_frac * 180.0;
 
         for lon in 0..=longitude_segments {
             let lon_frac = lon as f32 / longitude_segments as f32;
-            // Convert to degrees, going from -180° to 180°
             let lon_deg = lon_frac * 360.0 - 180.0;
 
             let elevation = dem.get_elevation(lat_deg, lon_deg);
-            let elevation_scaled = elevation / 1_737_400.0;
+            if elevation.is_finite() {
+                elevation_samples.push(elevation);
+            }
+        }
+    }
+
+    // Calculate smoothed min/max elevations
+    elevation_samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let lower_percentile = (elevation_samples.len() as f32 * 0.01) as usize;
+    let upper_percentile = (elevation_samples.len() as f32 * 0.99) as usize;
+
+    let min_elevation = elevation_samples[lower_percentile];
+    let max_elevation = elevation_samples[upper_percentile];
+    let elevation_range = max_elevation - min_elevation;
+
+    // Generate vertices
+    for lat in 0..=latitude_segments {
+        let lat_frac = lat as f32 / latitude_segments as f32;
+        let lat_deg = 90.0 - lat_frac * 180.0;
+
+        for lon in 0..=longitude_segments {
+            let lon_frac = lon as f32 / longitude_segments as f32;
+            let lon_deg = lon_frac * 360.0 - 180.0;
+
+            let elevation = dem.get_elevation(lat_deg, lon_deg);
+
+            // Smooth elevation scaling
+            const SCALE_FACTOR: f32 = 0.02; // Reduced scale factor
+            let elevation_normalized = (elevation - min_elevation) / elevation_range;
+            let elevation_scaled = elevation_normalized * SCALE_FACTOR;
 
             let lat_rad = lat_deg.to_radians();
             let lon_rad = lon_deg.to_radians();
@@ -287,29 +374,37 @@ fn create_moon_mesh(lod: usize, dem: &mut DEMManager) -> Mesh {
                 radius * cos_lat * lon_rad.sin(),
             );
 
+            // Use simpler normal calculation
             let normal = position.normalize();
 
             positions.push([position.x, position.y, position.z]);
             normals.push([normal.x, normal.y, normal.z]);
 
-            let u = (lon_deg + 180.0) / 360.0; // Convert [-180, 180] to [0, 1]
-            let v = (90.0 - lat_deg) / 180.0; // Convert [90, -90] to [0, 1]
+            let u = (lon_deg + 180.0) / 360.0;
+            let v = (90.0 - lat_deg) / 180.0;
 
-            uvs.push([u, v]);
+            if lon == longitude_segments {
+                uvs.push([1.0, v]);
+            } else {
+                uvs.push([u, v]);
+            }
         }
     }
 
-    // Generate indices with correct winding order
+    // Generate indices
     for lat in 0..latitude_segments {
         for lon in 0..longitude_segments {
             let first = lat * (longitude_segments + 1) + lon;
             let second = first + longitude_segments + 1;
 
-            // First triangle (counter-clockwise winding)
-            indices.extend_from_slice(&[first as u32, (first + 1) as u32, second as u32]);
-
-            // Second triangle (counter-clockwise winding)
-            indices.extend_from_slice(&[(first + 1) as u32, (second + 1) as u32, second as u32]);
+            indices.extend_from_slice(&[
+                first as u32,
+                (first + 1) as u32,
+                second as u32,
+                (first + 1) as u32,
+                (second + 1) as u32,
+                second as u32,
+            ]);
         }
     }
 
@@ -340,52 +435,55 @@ fn load_color_texture(path: &str) -> Image {
         width, height, new_width, new_height
     );
 
-    let mut data = Vec::new();
+    // Read all bands at once
+    let mut rgb_data = vec![Vec::new(); 3];
 
-    // Read RGB bands as f32 to preserve precision
     for band_index in 1..=3 {
         let band = dataset.rasterband(band_index).unwrap();
-
-        // Get band statistics
-        let StatisticsAll { min, max, .. } = band.get_statistics(true, true).unwrap().unwrap();
-
-        // Create buffer for f32 data
         let mut band_data = vec![0f32; new_width * new_height];
 
-        // Read raw data
+        // Use bilinear interpolation instead of cubic
         band.read_into_slice(
             (0, 0),
             (width, height),
             (new_width, new_height),
             &mut band_data,
-            None,
+            Some(gdal::raster::ResampleAlg::Bilinear),
         )
         .expect("Failed to read color band");
 
-        // Normalize the data with better precision
-        for value in band_data.iter_mut() {
-            // Normalize considering the full range
-            *value = ((*value - min as f32) / (max - min) as f32).clamp(0.0, 1.0);
+        rgb_data[band_index - 1] = band_data;
+    }
 
-            // Apply subtle gamma correction to preserve detail
-            *value = value.powf(1.0 / 1.2);
+    // Find global min/max after reading all bands
+    let mut global_min = f32::MAX;
+    let mut global_max = f32::MIN;
 
-            // Convert to u8 with dithering to reduce banding
-            let byte_value = (*value * 255.0) as u8;
-            data.push(byte_value);
+    for band_data in &rgb_data {
+        for &value in band_data {
+            if value.is_finite() {
+                global_min = global_min.min(value);
+                global_max = global_max.max(value);
+            }
         }
     }
 
-    // Convert to RGBA with proper color space handling
-    let mut rgba_data = Vec::with_capacity((new_width * new_height * 4) as usize);
+    // Convert to RGBA
+    let mut rgba_data = Vec::with_capacity(new_width * new_height * 4);
+
     for i in 0..(new_width * new_height) {
-        rgba_data.push(data[i]); // R
-        rgba_data.push(data[i + (new_width * new_height)]); // G
-        rgba_data.push(data[i + 2 * (new_width * new_height)]); // B
-        rgba_data.push(255); // A
+        let r = rgb_data[0][i];
+        let g = rgb_data[1][i];
+        let b = rgb_data[2][i];
+
+        let r_norm = ((r - global_min) / (global_max - global_min) * 255.0) as u8;
+        let g_norm = ((g - global_min) / (global_max - global_min) * 255.0) as u8;
+        let b_norm = ((b - global_min) / (global_max - global_min) * 255.0) as u8;
+
+        rgba_data.extend_from_slice(&[r_norm, g_norm, b_norm, 255]);
     }
 
-    Image::new(
+    let mut image = Image::new(
         bevy::render::render_resource::Extent3d {
             width: new_width as u32,
             height: new_height as u32,
@@ -393,8 +491,21 @@ fn load_color_texture(path: &str) -> Image {
         },
         bevy::render::render_resource::TextureDimension::D2,
         rgba_data,
-        // Use sRGB format for better color reproduction
         bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD,
-    )
+    );
+
+    image.texture_descriptor.usage |= bevy::render::render_resource::TextureUsages::TEXTURE_BINDING;
+    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::from(SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        address_mode_w: AddressMode::ClampToEdge,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        mipmap_filter: FilterMode::Linear,
+        anisotropy_clamp: 16u16,
+        ..default()
+    }));
+
+    image
 }
