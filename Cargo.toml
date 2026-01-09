@@ -1,17 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["crates/body-renderer",
+members = [
     "crates/coplanar",
-    "crates/body-renderer",
 ]
-
 
 [workspace.dependencies]
 anyhow = "1.0.86"
-itertools = "0.13.0"
 nalgebra = "0.33.0"
 simba = "0.9.0"
-thiserror = "1.0.65"
+thiserror = "2.0.3"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
@@ -20,3 +17,4 @@ opt-level = 1
 # Enable a large amount of optimization in the dev profile for dependencies.
 [profile.dev.package."*"]
 opt-level = 3
+

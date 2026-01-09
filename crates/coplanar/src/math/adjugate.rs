@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
-use nalgebra::{self as na, Matrix3, MatrixView3};
+use crate::float::Float;
+use nalgebra::{Matrix3, MatrixView3};
 use thiserror::Error;
 
 /// Errors that can occur during adjugate matrix calculation
@@ -27,7 +28,7 @@ pub enum AdjugateError {
 /// # Errors
 /// * `AdjugateError::NanError` - If the input matrix contains NaN or infinity values
 /// * `AdjugateError::NumericalInstabilityError` - If the matrix values are too large or small
-pub fn matrix_adjugate<F: na::RealField + Copy + Debug>(
+pub fn matrix_adjugate<F: Float>(
     matrix: &MatrixView3<F>,
 ) -> Result<Matrix3<F>, AdjugateError> {
     // Check for infinite or NaN values
@@ -67,8 +68,6 @@ pub fn matrix_adjugate<F: na::RealField + Copy + Debug>(
 
 #[cfg(test)]
 mod tests {
-    use core::{f32, f64};
-
     use super::*;
     use approx::assert_relative_eq;
     use nalgebra::Matrix3;

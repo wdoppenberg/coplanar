@@ -1,4 +1,5 @@
-use crate::geom::ellipse::planar::EllipseRepr;
+use crate::float::Float;
+use crate::geom::ellipse::repr::EllipseRepr;
 use crate::math::matrix_adjugate;
 use crate::PlanarEllipse;
 use anyhow::{anyhow, Result};
@@ -133,7 +134,7 @@ pub fn ellipse_pair_feature<F: na::RealField + Copy + Debug>(
 }
 
 /// Generate invariant feature for a set of three conics
-pub fn ellipse_triad_feature<F: na::RealField + Copy + Debug>(
+pub fn ellipse_triad_feature<F: Float>(
     a_1: &na::Matrix3<F>,
     a_2: &na::Matrix3<F>,
     a_3: &na::Matrix3<F>,
@@ -173,7 +174,7 @@ pub fn compute_invariants<F, R>(
     e3: &PlanarEllipse<R>,
 ) -> Result<CoplanarInvariants<F>>
 where
-    F: na::RealField + Copy + Debug,
+    F: Float,
     R: EllipseRepr<F = F>,
 {
     let [mat1, mat2, mat3] = [e1, e2, e3].map(|e| na::Unit::new_normalize(e.to_matrix()));
@@ -181,7 +182,7 @@ where
 }
 
 // Modified coplanar_invariants function
-pub fn coplanar_invariants<F: na::RealField + Copy + Debug>(
+pub fn coplanar_invariants<F: Float>(
     a_i: &na::Unit<na::Matrix3<F>>,
     a_j: &na::Unit<na::Matrix3<F>>,
     a_k: &na::Unit<na::Matrix3<F>>,

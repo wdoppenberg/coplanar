@@ -10,10 +10,7 @@ fn main() -> Result<(), coplanar::Error> {
     // Compute invariant features
     let invariants = compute_invariants(&ellipses[0], &ellipses[1], &ellipses[2])?;
 
-    // Access individual features
-    println!("I: {:?}", invariants);
-    println!("i_ij: {}", invariants.i_ij);
-    println!("i_ijk: {}", invariants.i_ijk);
+    println!("I: {:#?}", invariants);
 
     Ok(())
 }

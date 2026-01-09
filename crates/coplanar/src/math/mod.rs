@@ -1,6 +1,6 @@
 mod adjugate;
 pub mod conic;
-mod invariants;
+pub mod invariants;
 
 pub use adjugate::matrix_adjugate;
 

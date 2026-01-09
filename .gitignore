@@ -3,3 +3,6 @@
 /outputs
 
 **/*.tif
+
+/docs/bib/raw/*
+!/docs/bib/raw/.gitkeep

@@ -138,7 +138,7 @@ fn main() -> Result<()> {
     }
 
     // Configure space
-    rec.log_static("world", &rr::ViewCoordinates::RIGHT_HAND_Y_UP)?;
+    rec.log_static("world", &rr::ViewCoordinates::RIGHT_HAND_Y_UP())?;
     // rec.log(
     //     "world/xyz",
     //     &rr::Arrows3D::from_vectors(

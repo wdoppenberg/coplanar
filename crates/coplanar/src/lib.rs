@@ -5,6 +5,9 @@ pub mod geom;
 pub mod math;
 pub mod utils;
 pub mod vision;
+pub mod db;
+mod float;
+mod matcher;
 
 // Exports
 pub use error::Error;
