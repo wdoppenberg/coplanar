@@ -1,4 +1,6 @@
-use std::fmt::Debug;
+use alloc::format;
+use alloc::string::String;
+use core::fmt::Debug;
 
 use crate::float::Float;
 use nalgebra::{Matrix3, MatrixView3};
@@ -28,9 +30,7 @@ pub enum AdjugateError {
 /// # Errors
 /// * `AdjugateError::NanError` - If the input matrix contains NaN or infinity values
 /// * `AdjugateError::NumericalInstabilityError` - If the matrix values are too large or small
-pub fn matrix_adjugate<F: Float>(
-    matrix: &MatrixView3<F>,
-) -> Result<Matrix3<F>, AdjugateError> {
+pub fn matrix_adjugate<F: Float>(matrix: &MatrixView3<F>) -> Result<Matrix3<F>, AdjugateError> {
     // Check for infinite or NaN values
     if matrix.iter().any(|&x| !x.is_finite()) {
         return Err(AdjugateError::NanError);

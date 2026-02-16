@@ -1,9 +1,12 @@
+use core::fmt::Debug;
 use nalgebra as na;
-use num_traits::Bounded;
-use std::fmt::Debug;
+use num_traits::{Bounded, ToPrimitive};
 
 /// Trait bounds for a float-type
-pub trait Float: na::RealField + Debug + Copy + Send + Sync + PartialOrd + Bounded {}
+pub trait Float:
+    na::RealField + Debug + Copy + Send + Sync + PartialOrd + Bounded + ToPrimitive
+{
+}
 
 impl Float for f32 {}
 impl Float for f64 {}

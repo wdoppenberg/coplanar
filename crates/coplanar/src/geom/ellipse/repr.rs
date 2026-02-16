@@ -1,8 +1,8 @@
-use crate::geom::ellipse::planar::{Parametric, Quadratic};
 use crate::geom::ellipse::PlanarEllipseError;
+use crate::geom::ellipse::planar::{Parametric, Quadratic};
 use crate::math::conic;
+use core::fmt::Debug;
 use nalgebra as na;
-use std::fmt::Debug;
 
 /// Defines the behavior of an ellipse representation
 pub trait EllipseRepr: Debug {
@@ -64,25 +64,17 @@ impl<F: na::RealField + Copy> EllipseRepr for Quadratic<F> {
     */
     type F = F;
     fn semi_major(&self) -> F {
-        let (a, b) = self.extract_semi_axes();
-        if a > b {
-            a
-        } else {
-            b
-        }
+        let (a, b) = self.semi_axes();
+        if a > b { a } else { b }
     }
 
     fn semi_minor(&self) -> F {
-        let (a, b) = self.extract_semi_axes();
-        if a > b {
-            b
-        } else {
-            a
-        }
+        let (a, b) = self.semi_axes();
+        if a > b { b } else { a }
     }
 
     fn rotation(&self) -> F {
-        let m: &na::Matrix3<_> = &self;
+        let m: &na::Matrix3<_> = self;
 
         let a = m[(0, 0)]; // A[0,0]
         let b = m[(0, 1)]; // A[0,1] or A[1,0] (symmetric)

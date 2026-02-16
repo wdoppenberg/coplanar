@@ -1,9 +1,10 @@
+use alloc::vec::Vec;
 use itertools::Itertools;
 use nalgebra as na;
 
-use crate::geom::ellipse::repr::EllipseRepr;
 use crate::Error;
 use crate::PlanarEllipse;
+use crate::geom::ellipse::repr::EllipseRepr;
 
 /// Returns if a collection of ellipse (centers) is ordered clockwise (true) or not (false)
 pub(crate) fn is_clockwise<'a, F, I, R>(ellipses: I) -> Result<bool, Error>
@@ -12,7 +13,8 @@ where
     I: IntoIterator<Item = &'a PlanarEllipse<R>>,
     R: EllipseRepr<F = F> + 'a,
 {
-    let s = ellipses.into_iter()
+    let s = ellipses
+        .into_iter()
         // Get ellipse centers
         .filter_map(|e| e.center().ok())
         // Get sliding window iterator with n=2
@@ -37,7 +39,7 @@ pub enum EpsError {
 /// Arnas, D., Fialho, M. A. A., & Mortari, D. (2017). Fast and robust kernel generators for star
 /// trackers. Acta Astronautica, 134 (August 2016), 291–302.
 /// https://doi.org/10.1016/j.actaastro.2017.02.016
-///
+#[allow(dead_code)]
 pub struct EnhancedPatternShifting<T> {
     items: Vec<T>,
     n: usize,
@@ -120,7 +122,11 @@ where
 
 // Extension trait for easy usage
 pub trait EnhancedPatternShiftingExt: Iterator + Sized {
-    fn enhanced_pattern_shift(self, n: usize, start_n: usize) -> Result<EnhancedPatternShifting<Self::Item>, EpsError> {
+    fn enhanced_pattern_shift(
+        self,
+        n: usize,
+        start_n: usize,
+    ) -> Result<EnhancedPatternShifting<Self::Item>, EpsError> {
         EnhancedPatternShifting::new(self, n, start_n)
     }
 }
@@ -131,6 +137,8 @@ impl<T: Iterator> EnhancedPatternShiftingExt for T {}
 mod tests {
     use super::*;
     use crate::PlanarEllipse;
+    use alloc::collections::BTreeSet;
+    use alloc::vec;
 
     #[test]
     fn test_simple_case_cw() -> Result<(), Error> {
@@ -154,8 +162,6 @@ mod tests {
         Ok(())
     }
 
-    use std::collections::HashSet;
-
     #[test]
     fn test_worst_case_failure_count() {
         let n = 14; // As used in Fig. 4 of the paper
@@ -163,12 +169,10 @@ mod tests {
         let mut max_failures = 0;
 
         // Test for different numbers of false stars
-        for f in 1..=(n-3) {
+        for f in 1..=(n - 3) {
             let mut failure_count = 0;
             // Find worst case by trying different false star positions
-            let kernels = data.iter()
-                .enhanced_pattern_shift(n, 0)
-                .unwrap();
+            let kernels = data.iter().enhanced_pattern_shift(n, 0).unwrap();
 
             for (a, b, c) in kernels {
                 failure_count += 1;
@@ -181,7 +185,7 @@ mod tests {
         }
 
         // Should be lower than the theoretical maximum from lexicographic ordering
-        assert!(max_failures < n * (n-1) * (n-2) / 6);
+        assert!(max_failures < n * (n - 1) * (n - 2) / 6);
     }
 
     #[test]
@@ -190,13 +194,14 @@ mod tests {
         let data: Vec<_> = (0..n).collect();
         let mut counts = vec![0; n];
 
-        let triads: Vec<_> = data.iter()
-            .enhanced_pattern_shift(n, 0)
-            .unwrap()
-            .collect();
+        let triads: Vec<_> = data.iter().enhanced_pattern_shift(n, 0).unwrap().collect();
 
         // Check if all kernels are generated
-        assert_eq!(triads.len(), n * (n - 1) * (n - 2) / 6, "Should generate all combinations");
+        assert_eq!(
+            triads.len(),
+            n * (n - 1) * (n - 2) / 6,
+            "Should generate all combinations"
+        );
 
         let mut max_diff_ever = 0;
         for (a, b, c) in &triads {
@@ -206,7 +211,7 @@ mod tests {
             let current_diff = counts.iter().max().unwrap() - counts.iter().min().unwrap();
             max_diff_ever = max_diff_ever.max(current_diff);
         }
-        
+
         assert_eq!(max_diff_ever, 6);
     }
 
@@ -214,20 +219,21 @@ mod tests {
     fn test_expected_time_to_discovery() {
         let n = 10; // Use a smaller n to keep test fast, Table 4 says T(Q) = 18.03 for n=10
         let data: Vec<_> = (0..n).collect();
-        
+
         let mut total_kernels = 0;
         let mut total_scenes = 0;
-        
+
         // The paper says |S| = sum_{nt=k}^n (n choose nt)
         // This is all combinations of stars where at least k stars are present.
         for nt in 3..=n {
             for real_indices in (0..n).combinations(nt) {
                 let mut count = 0;
-                for (a, b, c) in data.iter()
-                    .enhanced_pattern_shift(n, 0)
-                    .unwrap() {
+                for (a, b, c) in data.iter().enhanced_pattern_shift(n, 0).unwrap() {
                     count += 1;
-                    if real_indices.contains(a) && real_indices.contains(b) && real_indices.contains(c) {
+                    if real_indices.contains(a)
+                        && real_indices.contains(b)
+                        && real_indices.contains(c)
+                    {
                         break;
                     }
                 }
@@ -238,20 +244,17 @@ mod tests {
 
         let avg_time = total_kernels as f64 / total_scenes as f64;
         // Table 4: n=10, EPS, k=3 -> 18.03
-        assert!((avg_time - 18.03).abs() < 1.0); 
+        assert!((avg_time - 18.03).abs() < 1.0);
     }
 
     #[test]
     fn test_sequence_properties() {
         let n = 5;
         let data: Vec<_> = (0..n).collect();
-        let triads: Vec<_> = data.iter()
-            .enhanced_pattern_shift(n, 0)
-            .unwrap()
-            .collect();
+        let triads: Vec<_> = data.iter().enhanced_pattern_shift(n, 0).unwrap().collect();
 
         // Test no duplicates
-        let mut seen = HashSet::new();
+        let mut seen = BTreeSet::new();
         for &(a, b, c) in &triads {
             let key = (a, b, c);
             assert!(seen.insert(key), "Found duplicate triad");
@@ -263,8 +266,10 @@ mod tests {
             if let [(a1, _, _), (a2, _, _)] = window {
                 // Either the difference is 3 or we've wrapped/changed pattern
                 if a2 > a1 {
-                    assert!(*a2 - *a1 == 3 || *a2 - *a1 == 1,
-                        "Invalid increment pattern");
+                    assert!(
+                        *a2 - *a1 == 3 || *a2 - *a1 == 1,
+                        "Invalid increment pattern"
+                    );
                 }
             }
         }
@@ -274,7 +279,7 @@ mod tests {
     fn contains_false_stars<T: PartialEq>(
         (i, j, k): (&T, &T, &T),
         data: &Vec<T>,
-        false_stars: usize
+        false_stars: usize,
     ) -> bool {
         let false_start = data.len() - false_stars;
         let idx_i = data.iter().position(|x| x == i).unwrap();

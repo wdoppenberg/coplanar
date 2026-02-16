@@ -9,7 +9,9 @@ pub enum EllipseMatrixError {
     #[error("Semi-minor axis 'b' must be positive, got {0}")]
     NonPositiveSemiMinorAxis(f64),
 
-    #[error("Semi-major axis 'a' must be greater than or equal to semi-minor axis 'b', got a={0}, b={1}")]
+    #[error(
+        "Semi-major axis 'a' must be greater than or equal to semi-minor axis 'b', got a={0}, b={1}"
+    )]
     InvalidAxesRatio(f64, f64),
 
     #[error("Matrix is degenerate, det={0}")]
@@ -106,6 +108,7 @@ pub fn compute_ellipse_matrix<F: na::RealField + Copy>(
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
+    use core::f64::consts::PI;
 
     fn assert_matrix_eq(a: &na::Matrix3<f64>, b: &na::Matrix3<f64>) {
         for i in 0..3 {
@@ -130,7 +133,7 @@ mod tests {
     fn test_circle_rotation_invariance() {
         // A circle should produce the same matrix regardless of rotation
         let m1 = compute_matrix(1.0, 1.0, 0.0, 0.0, 0.0);
-        let m2 = compute_matrix(1.0, 1.0, std::f64::consts::PI / 4.0, 0.0, 0.0);
+        let m2 = compute_matrix(1.0, 1.0, PI / 4.0, 0.0, 0.0);
         assert_matrix_eq(&m1, &m2);
     }
 
@@ -160,7 +163,7 @@ mod tests {
     #[test]
     fn test_rotated_ellipse() {
         // Test a 45-degree rotated ellipse
-        let m = compute_matrix(2.0, 1.0, std::f64::consts::PI / 4.0, 0.0, 0.0);
+        let m = compute_matrix(2.0, 1.0, PI / 4.0, 0.0, 0.0);
         // For a rotated ellipse, off-diagonal terms should be non-zero
         // and matrix should be symmetric
         assert_relative_eq!(m[(0, 1)], m[(1, 0)], epsilon = 1e-10);
@@ -179,7 +182,6 @@ mod tests {
     #[test]
     fn test_valid_ellipse() {
         let result = compute_ellipse_matrix(2.0f64, 1.0, 0.0, 0.0, 0.0);
-        println!("{:?}", result);
         assert!(result.is_ok());
     }
 
@@ -187,7 +189,6 @@ mod tests {
     fn test_degenerate_matrix() {
         // Creating a degenerate case by using very small values
         let result = compute_ellipse_matrix(1e-10f64, 1e-10, 0.0, 0.0, 0.0);
-        println!("{:?}", result);
         assert!(matches!(result, Err(EllipseMatrixError::Degenerate(_))));
     }
 

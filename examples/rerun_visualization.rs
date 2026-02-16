@@ -1,5 +1,5 @@
 use anyhow::Result;
-use coplanar::{utils::sampling::sample_ellipse_points, SpatialEllipse};
+use coplanar::{SpatialEllipse, utils::sampling::sample_ellipse_points};
 use nalgebra as na;
 use rerun as rr;
 use std::f32::consts::PI;

@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use core::fmt::Debug;
 use nalgebra as na;
-use std::fmt::Debug;
 
 use crate::geom::ellipse::planar::Quadratic;
 use crate::{
-    vision::camera::{project_ellipse, CameraIntrinsics, CameraPose},
     PlanarEllipse,
+    vision::camera::{CameraIntrinsics, CameraPose, project_ellipse},
 };
 
 /// Represents an ellipse embedded in 3D space
@@ -162,7 +162,7 @@ impl<F: na::RealField + Copy> CameraPose<F> {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-    use std::f64::consts::PI;
+    use core::f64::consts::PI;
 
     #[test]
     fn test_spatial_ellipse_creation() {

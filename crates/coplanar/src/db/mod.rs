@@ -1,59 +1,21 @@
-use crate::float::Float;
-use backend::StorageBackend;
-use record::EllipseRecord;
-use std::marker::PhantomData;
-
-mod backend;
-mod record;
-mod memory;
+pub mod backend;
 pub mod entry;
+#[cfg(feature = "std")]
+pub mod file;
 pub mod index;
+pub mod memory;
+pub mod record;
 
-pub struct EllipseTriadDatabase<B, F>
-where
-	B: StorageBackend<F> + 'static,
-	F: Float
-{
-	storage: B,
-	_marker: PhantomData<F>
-}
+mod r#impl;
+#[cfg(test)]
+mod tests;
 
-enum Query<F>
-where
-	F: Float
-{
-	ByEllipse(EllipseRecord<F>),
-	ByTriad([EllipseRecord<F>; 3]),
-}
-
-impl<F> Query<F>
-where
-	F: Float
-{
-	fn ellipse(val: impl Into<EllipseRecord<F>>) -> Self {
-		Self::ByEllipse(val.into())
-	}
-
-	fn triad(val: impl Into<[EllipseRecord<F>; 3]>) -> Self {
-		Self::ByTriad(val.into())
-	}
-}
-
-
-impl<B, F> EllipseTriadDatabase<B, F>
-where
-	B: StorageBackend<F> + 'static,
-	F: Float
-{
-	fn select(query: Query<F>) -> Vec<EllipseRecord<F>> { 
-		todo!() 
-	}
-	
-	fn from_ellipse_iter(iter: impl IntoIterator<Item = impl Into<EllipseRecord<F>>>) {
-		todo!()
-	}
-
-	fn from_triad_iter(iter: impl IntoIterator<Item = [impl Into<EllipseRecord<F>>; 3]>) {
-		todo!()
-	}
-}
+// Re-exports
+pub use backend::{BackendError, IndexedStorageBackend, SearchResult, StorageBackend};
+pub use entry::InvariantEntry;
+#[cfg(feature = "std")]
+pub use file::FileBackend;
+pub use r#impl::EllipseTriadDatabase;
+pub use index::IndexOptions;
+pub use memory::InMemoryBackend;
+pub use record::EllipseRecord;

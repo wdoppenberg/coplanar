@@ -1,8 +1,9 @@
+use crate::EllipseIdx;
 use crate::float::Float;
 use crate::math::invariants::CoplanarInvariants;
-use crate::EllipseIdx;
 
+#[derive(Debug, Clone)]
 pub struct InvariantEntry<F: Float> {
-    pub(crate) triad: [EllipseIdx; 3],
-    pub(crate) invariants: CoplanarInvariants<F>,
+    pub triad: [EllipseIdx; 3],
+    pub invariants: CoplanarInvariants<F>,
 }

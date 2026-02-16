@@ -1,8 +1,8 @@
-use crate::geom::ellipse::planar::Quadratic;
 use crate::PlanarEllipse;
-use anyhow::{anyhow, Result};
+use crate::geom::ellipse::planar::Quadratic;
+use anyhow::{Result, anyhow};
+use core::fmt::Debug;
 use nalgebra as na;
-use std::fmt::Debug;
 
 /// Camera intrinsic parameters
 #[derive(Debug, Clone)]
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_off_center_projection() -> Result<()> {
-        let pi: f64 = std::f64::consts::PI;
+        let pi: f64 = core::f64::consts::PI;
 
         // Create a camera looking at a 45-degree angle
         let camera = CameraPose::from_position_attitude(

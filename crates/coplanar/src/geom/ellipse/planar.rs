@@ -1,6 +1,6 @@
+use core::fmt::Debug;
+use core::ops::{Deref, DerefMut};
 use nalgebra as na;
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
 use thiserror::Error;
 
 use crate::geom::ellipse::repr::EllipseRepr;
@@ -35,14 +35,14 @@ pub struct Parametric<F: na::RealField + Copy> {
 pub struct Quadratic<F: na::RealField>(na::Matrix3<F>);
 
 impl<F: na::RealField + Copy> Quadratic<F> {
-    pub fn extract_semi_axes(&self) -> (F, F) {
+    pub fn semi_axes(&self) -> (F, F) {
         let det_33 = self.fixed_view::<2, 2>(0, 0).determinant();
         let det_q = self.determinant();
         let eigvals = self.fixed_view::<2, 2>(0, 0).symmetric_eigenvalues();
-        let [a1, a2] = eigvals
-            .as_ref()
-            .map(|l| l / (-det_q / det_33))
-            .map(|l| (F::one() / l).sqrt());
+        let scale = -det_q / det_33;
+
+        let a1 = (F::one() / (eigvals.x / scale)).sqrt();
+        let a2 = (F::one() / (eigvals.y / scale)).sqrt();
 
         (a2, a1)
     }
@@ -82,19 +82,19 @@ impl<F: na::RealField + Copy> PlanarEllipse<Quadratic<F>> {
 impl<F: na::RealField + Debug + Copy> na::Normed for PlanarEllipse<Quadratic<F>> {
     type Norm = F;
     fn norm(&self) -> Self::Norm {
-        self.0 .0.norm()
+        self.0.0.norm()
     }
 
     fn norm_squared(&self) -> Self::Norm {
-        self.0 .0.norm_squared()
+        self.0.0.norm_squared()
     }
 
     fn scale_mut(&mut self, n: Self::Norm) {
-        self.0 .0.scale_mut(n);
+        self.0.0.scale_mut(n);
     }
 
     fn unscale_mut(&mut self, n: Self::Norm) {
-        self.0 .0.unscale_mut(n);
+        self.0.0.unscale_mut(n);
     }
 }
 
@@ -133,7 +133,7 @@ impl<R: EllipseRepr> DerefMut for PlanarEllipse<R> {
 
 impl<F: na::RealField + Copy> AsRef<na::Matrix3<F>> for PlanarEllipse<Quadratic<F>> {
     fn as_ref(&self) -> &na::Matrix3<F> {
-        &self.0 .0
+        &self.0.0
     }
 }
 
@@ -146,22 +146,19 @@ mod tests {
         use crate::geom::ellipse::repr::EllipseRepr;
         use crate::math::conic;
         use approx::assert_relative_eq;
-        use std::f64::consts::PI;
+        use core::f64::consts::PI;
 
         #[test]
         fn test_rotation_angles() {
-            let test_angles = vec![0.0, PI / 6.0, PI / 4.0, PI / 3.0, PI / 2.0];
+            let test_angles = [0.0, PI / 6.0, PI / 4.0, PI / 3.0, PI / 2.0];
 
             for &theta in &test_angles {
-                println!("Testing angle: {}", theta);
-
                 // Create an ellipse with the given rotation
                 let matrix = conic::compute_matrix(2.0, 1.0, theta, 0.0, 0.0);
                 let ellipse = PlanarEllipse::<Quadratic<f64>>::try_from_matrix(matrix).unwrap();
 
                 // Extract the rotation and compare
                 let extracted = ellipse.rotation();
-                println!("Input angle: {}, Extracted: {}", theta, extracted);
 
                 assert_relative_eq!(extracted, theta, epsilon = 1e-10);
             }
@@ -187,7 +184,7 @@ mod tests {
         use super::*;
         use crate::geom::ellipse::repr::EllipseRepr;
         use approx::assert_relative_eq;
-        use std::f64::consts::PI;
+        use core::f64::consts::PI;
 
         fn normalize_rotation(rot: f64) -> f64 {
             // Handle rotation ambiguity - normalize to [0, PI)
@@ -203,20 +200,8 @@ mod tests {
             e2: &R2,
             epsilon: f64,
         ) {
-            // Print parameters for debugging
-            println!("\nOriginal parameters:");
-            println!("semi_major: {}", e1.semi_major());
-            println!("semi_minor: {}", e1.semi_minor());
-            println!("rotation: {}", e1.rotation());
             let (x1, y1) = e1.center().unwrap();
-            println!("center: ({}, {})", x1, y1);
-
-            println!("\nConverted parameters:");
-            println!("semi_major: {}", e2.semi_major());
-            println!("semi_minor: {}", e2.semi_minor());
-            println!("rotation: {}", e2.rotation());
             let (x2, y2) = e2.center().unwrap();
-            println!("center: ({}, {})", x2, y2);
 
             // For non-circular ellipses, we need to handle the fact that swapping axes
             // and rotating by PI/2 gives an equivalent ellipse
@@ -248,10 +233,6 @@ mod tests {
                 )
             };
 
-            println!("\nNormalized parameters for comparison:");
-            println!("Original: a={}, b={}, θ={}", maj1, min1, rot1);
-            println!("Converted: a={}, b={}, θ={}", maj2, min2, rot2);
-
             assert_relative_eq!(maj1, maj2, epsilon = epsilon);
             assert_relative_eq!(min1, min2, epsilon = epsilon);
             assert_relative_eq!(rot1, rot2, epsilon = epsilon);
@@ -262,11 +243,7 @@ mod tests {
         #[test]
         fn test_circle_conversion() {
             let parametric = PlanarEllipse::from_parameters(2.0, 2.0, 0.0, 0.0, 0.0);
-
-            println!("\nTesting circle conversion:");
             let quadratic = parametric.clone().try_into_quadratic().unwrap();
-            println!("\nQuadratic matrix:");
-            println!("{:?}", quadratic);
 
             let parametric_back = quadratic.try_into_parametric();
 
@@ -280,11 +257,7 @@ mod tests {
         #[test]
         fn test_ellipse_conversion() {
             let parametric = PlanarEllipse::from_parameters(3.0, 1.0, 0.0, 0.0, 0.0);
-
-            println!("\nTesting horizontal ellipse conversion:");
             let quadratic = parametric.clone().try_into_quadratic().unwrap();
-            println!("\nQuadratic matrix:");
-            println!("{:?}", quadratic);
 
             let parametric_back = quadratic.try_into_parametric();
 
@@ -298,11 +271,7 @@ mod tests {
         #[test]
         fn test_rotated_ellipse_conversion() {
             let parametric = PlanarEllipse::from_parameters(3.0, 1.0, PI / 4.0, 0.0, 0.0);
-
-            println!("\nTesting rotated ellipse conversion:");
             let quadratic = parametric.clone().try_into_quadratic().unwrap();
-            println!("\nQuadratic matrix:");
-            println!("{:?}", quadratic);
 
             let parametric_back = quadratic.try_into_parametric();
 
@@ -316,11 +285,7 @@ mod tests {
         #[test]
         fn test_translated_ellipse_conversion() {
             let parametric = PlanarEllipse::from_parameters(3.0, 1.0, 0.0, 2.0, 3.0);
-
-            println!("\nTesting translated ellipse conversion:");
             let quadratic = parametric.clone().try_into_quadratic().unwrap();
-            println!("\nQuadratic matrix:");
-            println!("{:?}", quadratic);
 
             let parametric_back = quadratic.try_into_parametric();
 

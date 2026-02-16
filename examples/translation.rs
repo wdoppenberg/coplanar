@@ -1,5 +1,5 @@
 use approx::assert_relative_eq;
-use coplanar::{compute_invariants, SpatialEllipse};
+use coplanar::{SpatialEllipse, compute_invariants};
 use nalgebra as na;
 
 fn main() -> Result<(), coplanar::Error> {

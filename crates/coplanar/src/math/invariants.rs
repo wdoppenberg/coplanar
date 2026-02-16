@@ -1,10 +1,12 @@
+use crate::PlanarEllipse;
 use crate::float::Float;
 use crate::geom::ellipse::repr::EllipseRepr;
 use crate::math::matrix_adjugate;
-use crate::PlanarEllipse;
-use anyhow::{anyhow, Result};
+use alloc::vec;
+use alloc::vec::Vec;
+use anyhow::{Result, anyhow};
+use core::fmt::Debug;
 use nalgebra as na;
-use std::fmt::Debug;
 
 /// Translation-invariant features describing the relationship between three ellipses
 #[derive(Debug, Clone, PartialEq)]
@@ -211,11 +213,11 @@ pub fn coplanar_invariants<F: Float>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geom::ellipse::planar::Parametric;
     use crate::PlanarEllipse;
     use crate::SpatialEllipse;
+    use crate::geom::ellipse::planar::Parametric;
     use approx::assert_relative_eq;
-    use std::f64::consts::PI;
+    use core::f64::consts::PI;
 
     fn create_test_ellipses() -> [PlanarEllipse<Parametric<f64>>; 3] {
         // Create a triangular configuration for better stability
@@ -258,7 +260,6 @@ mod tests {
 
             // Check determinant is non-zero
             let det = e.determinant();
-            println!("Determinant: {}", det);
             assert_ne!(det, 0.0);
 
             // Check that matrix is invertible

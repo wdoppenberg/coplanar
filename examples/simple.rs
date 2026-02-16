@@ -1,4 +1,4 @@
-use coplanar::{compute_invariants, PlanarEllipse};
+use coplanar::{PlanarEllipse, compute_invariants};
 
 fn main() -> Result<(), coplanar::Error> {
     let ellipses = [
