@@ -50,6 +50,7 @@ pub struct EnhancedPatternShifting<T> {
 }
 
 impl<T> EnhancedPatternShifting<T> {
+    #[allow(dead_code)]
     pub fn new<I>(iter: I, n: usize, _start_n: usize) -> Result<Self, EpsError>
     where
         I: Iterator<Item = T>,
@@ -121,6 +122,7 @@ where
 }
 
 // Extension trait for easy usage
+#[allow(dead_code)]
 pub trait EnhancedPatternShiftingExt: Iterator + Sized {
     fn enhanced_pattern_shift(
         self,

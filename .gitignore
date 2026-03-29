@@ -1,6 +1,7 @@
 /target
 /.idea
 /outputs
+/crates/**/target
 
 **/*.tif
 

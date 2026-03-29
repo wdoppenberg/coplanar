@@ -30,7 +30,7 @@ impl<F: Float> rstar::Point for InvariantPoint<F> {
     type Scalar = F;
     const DIMENSIONS: usize = 7;
 
-    fn generate(mut generator: impl FnMut(usize) -> Self::Scalar) -> Self {
+    fn generate(generator: impl FnMut(usize) -> Self::Scalar) -> Self {
         Self {
             point: core::array::from_fn(generator),
             triad: [0, 0, 0],
