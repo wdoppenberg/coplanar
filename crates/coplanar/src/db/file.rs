@@ -96,8 +96,8 @@ impl<F: Float> FileBackend<F> {
 
         // Read ellipse matrix (9 floats)
         let mut matrix_data = [F::zero(); 9];
-        for i in 0..9 {
-            matrix_data[i] = Self::read_float(reader)?;
+        for v in &mut matrix_data {
+            *v = Self::read_float(reader)?;
         }
         let matrix = nalgebra::Matrix3::from_column_slice(&matrix_data);
 

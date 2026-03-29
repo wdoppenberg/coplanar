@@ -7,6 +7,7 @@ use crate::PlanarEllipse;
 use crate::geom::ellipse::repr::EllipseRepr;
 
 /// Returns if a collection of ellipse (centers) is ordered clockwise (true) or not (false)
+#[allow(dead_code)]
 pub(crate) fn is_clockwise<'a, F, I, R>(ellipses: I) -> Result<bool, Error>
 where
     F: na::RealField,
